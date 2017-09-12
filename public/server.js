@@ -1,179 +1,184 @@
-"use strict";
+'use strict';
 
-/**
- * User sessions
- * @param {array} users
- */
-var users = [];
+var games = [];
+var words = ['face', 'cat', 'dog', 'chair', 'table', 'knife'];
 
-/**
- * Find opponent for a user
- * @param {User} user
- */
-function findOpponent(user) {
-	for (var i = 0; i < users.length; i++) {
-		if (
-			user !== users[i] && 
-			users[i].opponent === null
-		) {
-			new Game(user, users[i]).start();
+function getRandomInt(min, max) {
+	min = Math.ceil(min);
+	max = Math.floor(max);
+	return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+  }
+
+function findGame() {
+	for (var i=0; i < games.length; i++) {
+		if (games[i].hasSpot()) {
+			return games[i];
+		}
+	}
+	var newGame = new Game()
+	games.push(newGame);
+	return newGame;
+}
+
+function Game() {
+	this.users = [];
+	this.drawingUser = -1;
+	this.capacity = 2;
+	this.word = '';
+	this.correctlyGuessedPlayers = 0;
+}
+
+Game.prototype.hasSpot = function() {
+	return this.users.length < this.capacity;
+}
+
+Game.prototype.join = function (user) {
+	if (this.users.length == this.capacity) {
+		// throw error
+		return;
+	}
+	this.users.push(user);
+	this.users[this.users.length - 1].id = this.users.length - 1;
+	if (this.users.length == this.capacity) {
+		this.start();
+	}
+}
+
+Game.prototype.leave = function (user) {
+	this.users.splice(users.indexOf(user), 1);
+}
+
+Game.prototype.start = function (playerId) {
+	if (!playerId)
+		this.drawingUser = 0;
+	else
+		this.drawingUser = playerId;
+
+	this.word = words[getRandomInt(0, words.length - 1)];
+	this.guessedCorrectPlayers = 0;
+	for (var i=0; i < this.users.length; i++) {
+		console.log('users[i]', this.users[i].socket);
+		var startPayload = {players: this.getUsers(), drawingPlayerId: this.drawingUser};
+		if (i === this.drawingUser) {
+			startPayload.word = this.word;
+		}
+		this.users[i].start(startPayload);
+	}
+}
+
+Game.prototype.announce = function (event, payload) {
+	for (var i = 0; i < this.users.length; i++) {
+		this.users[i].socket.emit(event, payload);	
+	}
+}
+
+Game.prototype.getUsers = function () {
+	var users = [];
+	for (var i = 0; i < this.users.length; i++) {
+		users.push({
+			name: this.users[i].name,
+			id: this.users[i].id,
+			score: this.users[i].score
+		});
+	}
+	return users
+}
+
+function User(socket) {
+	this.socket = socket;
+	this.id = null;
+	this.name = '';
+	this.state = 'Waiting';
+	this.game = null;
+	this.score = 0;
+}
+
+User.prototype.start = function (payload) {
+	this.socket.emit('gameStart', payload);
+}
+
+User.prototype.emit = function (eventName, payload) {
+	this.socket.emit(eventName, payload);
+}
+
+User.prototype.guessWord = function (word) {
+	var isCorrectGuess = this.game.word === word;
+	if (isCorrectGuess) {
+		this.score = this.game.capacity - this.game.guessedCorrectPlayers;
+	}
+	return isCorrectGuess;
+};
+
+User.prototype.broadcastToOthers = function (event, payload) {
+	for (var i=0; i < this.game.users.length; i++) {
+		if (i !== this.id) {
+			this.game.users[i].emit(event, payload);
 		}
 	}
 }
-
-/**
- * Remove user session
- * @param {User} user
- */
-function removeUser(user) {
-	users.splice(users.indexOf(user), 1);
-}
-
-/**
- * Game class
- * @param {User} user1
- * @param {User} user2
- */
-function Game(user1, user2) {
-	this.user1 = user1;
-	this.user2 = user2;
-}
-
-/**
- * Start new game
- */
-Game.prototype.start = function () {
-	this.user1.start(this, this.user2);
-	this.user2.start(this, this.user1);
-}
-
-/**
- * Is game ended
- * @return {boolean}
- */
-Game.prototype.ended = function () {
-	return this.user1.guess !== GUESS_NO && this.user2.guess !== GUESS_NO;
-}
-
-/**
- * Final score
- */
-Game.prototype.score = function () {
-	if (
-		this.user1.guess === GUESS_ROCK && this.user2.guess === GUESS_SCISSORS ||
-		this.user1.guess === GUESS_PAPER && this.user2.guess === GUESS_ROCK ||
-		this.user1.guess === GUESS_SCISSORS && this.user2.guess === GUESS_PAPER
-	) {
-		this.user1.win();
-		this.user2.lose();
-	} else if (
-		this.user2.guess === GUESS_ROCK && this.user1.guess === GUESS_SCISSORS ||
-		this.user2.guess === GUESS_PAPER && this.user1.guess === GUESS_ROCK ||
-		this.user2.guess === GUESS_SCISSORS && this.user1.guess === GUESS_PAPER
-	) {
-		this.user2.win();
-		this.user1.lose();
-	} else {
-		this.user1.draw();
-		this.user2.draw();
-	}
-}
-
-/**
- * User session class
- * @param {Socket} socket
- */
-function User(socket) {
-	this.socket = socket;
-	this.game = null;
-	this.opponent = null;
-	this.guess = GUESS_NO;
-}
-
-/**
- * Set guess value
- * @param {number} guess
- */
-User.prototype.setGuess = function (guess) {
-	if (
-		!this.opponent ||
-		guess <= GUESS_NO ||
-		guess > GUESS_SCISSORS
-	) {
-		return false;
-	}
-	this.guess = guess;
-	return true;
-};
-
-/**
- * Start new game
- * @param {Game} game
- * @param {User} opponent
- */
-User.prototype.start = function (game, opponent) {
-	this.game = game;
-	this.opponent = opponent;
-	this.guess = GUESS_NO;
-	this.socket.emit("start");		
-};
-
-/**
- * Terminate game
- */
-User.prototype.end = function () {
-	this.game = null;
-	this.opponent = null;
-	this.guess = GUESS_NO;
-	this.socket.emit("end");
-};
-
-/**
- * Trigger win event
- */
-User.prototype.win = function () {
-	this.socket.emit("win", this.opponent.guess);
-};
-
-/**
- * Trigger lose event
- */
-User.prototype.lose = function () {
-	this.socket.emit("lose", this.opponent.guess);
-};
-
-/**
- * Trigger draw event
- */
-User.prototype.draw = function () {
-	this.socket.emit("draw", this.opponent.guess);
-};
 
 /**
  * Socket.IO on connect event
  * @param {Socket} socket
  */
 module.exports = function (socket) {
-	var user = new User(socket);
-	users.push(user);
-	findOpponent(user);
-	
-	socket.on("disconnect", function () {
-		console.log("Disconnected: " + socket.id);
-		removeUser(user);
-		if (user.opponent) {
-			user.opponent.end();
-			findOpponent(user.opponent);
-		}
+	var connectedUser = new User(socket);
+
+	socket.on('disconnect', function () {
+		//connectedUser.game.leave(connectedUser);
+		console.log('Disconnected: ' + socket.id);
 	});
 
-	socket.on("guess", function (guess) {
-		console.log("Guess: " + socket.id);
-		if (user.setGuess(guess) && user.game.ended()) {
-			user.game.score();
-			user.game.start();
-		}
+	socket.on('join', function (payload) {
+		console.log(payload);
+		connectedUser.name = payload.username;
+		var game = findGame();
+		console.log(game);
+		console.log('before join')
+		game.join(connectedUser);
+		console.log('after join')
+		connectedUser.game = game;
+		console.log('end of  join')
+		console.log(game);
 	});
 
-	console.log("Connected: " + socket.id);
-};
+	socket.on('draw-mousedown', function (payload) {
+		if (connectedUser.game)
+			connectedUser.broadcastToOthers('draw-mousedown', payload);
+	});
+	socket.on('draw-mouseup', function (payload) {
+		if (connectedUser.game)
+			connectedUser.broadcastToOthers('draw-mouseup', payload);
+	});
+	socket.on('draw-mousemove', function (payload) {
+		if (connectedUser.game)
+			connectedUser.broadcastToOthers('draw-mousemove', payload);
+	});	
+	socket.on('guess', function (payload) {
+		if (connectedUser.game) {
+			var guessPayload = {
+				by: connectedUser.name,
+				byId: connectedUser.id
+			};
+			var isCorrectGuess = connectedUser.guessWord(payload.word);
+			if (!isCorrectGuess) {
+				guessPayload.result = 'guess-wrong';
+				guessPayload.word = payload.word;
+			} else {
+				guessPayload.result = 'guess-correct';
+				connectedUser.game.correctlyGuessedPlayers++;
+			}
+			guessPayload.score = connectedUser.score;
+			connectedUser.game.announce(guessPayload.result, guessPayload);
+			if (connectedUser.game.correctlyGuessedPlayers === connectedUser.game.users.length - 1) {
+				connectedUser.game.announce('game-end',
+					{
+						reason: 'All players found the lost object',
+						players: connectedUser.game.getUsers()
+					}
+				);
+			}
+		}
+	});
+	console.log('Connected: ' + socket.id);
+}

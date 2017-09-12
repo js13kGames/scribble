@@ -2,120 +2,162 @@
 
 (function () {
 
-    var socket, //Socket.IO client
-        buttons, //Button elements
-        message, //Message element
-        score, //Score element
-        points = { //Game points
-            draw: 0,
-            win: 0,
-            lose: 0
-        };
+    var socket;
+    var canvas = document.getElementById('gameBoard');
+    var guessLogList = document.getElementById('guessLogList');
+    var scoreList = document.getElementById('scoreList');
+    var canvasPressed = false, drawLock = true;
+    var ctx = canvas.getContext('2d');
+    var rect = canvas.getBoundingClientRect();
+    var initClientX, initClientY;
 
-    /**
-     * Disable all button
-     */
-    function disableButtons() {
-        for (var i = 0; i < buttons.length; i++) {
-            buttons[i].setAttribute("disabled", "disabled");
+    function setConnectionStatus(message) {
+        var connectionStatus = document.getElementById('connectionStatus');
+        connectionStatus.innerText = message;
+    }
+
+    function setCurrentView(viewName) {
+        var views = ['Join', 'Game', 'Result'];
+
+        for(var i=0; i < views.length; i++) {
+            var viewDisplay = 'none';
+            if (views[i] === viewName) {
+                viewDisplay = 'block'
+            }
+            document
+                .getElementById('page' + views[i])
+                .style.display = viewDisplay;
         }
     }
 
-    /**
-     * Enable all button
-     */
-    function enableButtons() {
-        for (var i = 0; i < buttons.length; i++) {
-            buttons[i].removeAttribute("disabled");
-        }
+    function setVisibility(component, visibility) {
+        component.style.display = visibility;
     }
 
-    /**
-     * Set message text
-     * @param {string} text
-     */
-    function setMessage(text) {
-        message.innerHTML = text;
-    }
-
-    /**
-     * Set score text
-     * @param {string} text
-     */
-    function displayScore(text) {
-        score.innerHTML = [
-            "<h2>" + text + "</h2>",
-            "Won: " + points.win,
-            "Lost: " + points.lose,
-            "Draw: " + points.draw
-        ].join("<br>");
-    }
-
-    /**
-     * Binde Socket.IO and button events
-     */
-    function bind() {
-
-        socket.on("start", function () {
-            enableButtons();
-            setMessage("Round " + (points.win + points.lose + points.draw + 1));
-        });
-
-        socket.on("win", function () {
-            points.win++;
-            displayScore("You win!");
-        });
-
-        socket.on("lose", function () {
-            points.lose++;
-            displayScore("You lose!");
-        });
-
-        socket.on("draw", function () {
-            points.draw++;
-            displayScore("Draw!");
-        });
-
-        socket.on("end", function () {
-            disableButtons();
-            setMessage("Waiting for opponent...");
-        });
-
+    function bindConnectionEvents() {
         socket.on("connect", function () {
-            disableButtons();
-            setMessage("Waiting for opponent...");
+            setConnectionStatus('Have fun!')
         });
 
         socket.on("disconnect", function () {
-            disableButtons();
-            setMessage("Connection lost!");
+            setConnectionStatus("Connection lost!");
         });
 
         socket.on("error", function () {
-            disableButtons();
-            setMessage("Connection error!");
+            setConnectionStatus("Connection error!");
         });
-
-        for (var i = 0; i < buttons.length; i++) {
-            (function (button, guess) {
-                button.addEventListener("click", function (e) {
-                    disableButtons();
-                    socket.emit("guess", guess);
-                }, false);
-            })(buttons[i], i + 1);
-        }
     }
 
+    function bindGameEvents() {
+        socket.on('gameStart', function (payload) {
+            console.log(payload);
+            var playersList = document.getElementById('playersList');
+            for (var i = 0; i < payload.players.length; i++) {
+                var user = payload.players[i];
+                var ele = document.createElement('li');
+                ele.innerText = user.name + ' [ ' + user.score + ' ] ';
+                ele.id = 'player' + user.id;
+                playersList.appendChild(ele);
+            }
+            if (payload.word) {
+                drawLock = false;
+                document.getElementById('help').innerHTML = 'Draw <b>' + payload.word + '</b>';
+                setVisibility(document.getElementById('guessComponent'), 'none');
+            } else {
+                drawLock = true;
+                setVisibility(document.getElementById('guessComponent'), 'block');
+            }
+        });
+
+        var remoteMousePressed = false;
+        socket.on('draw-mousedown', function (evt) {
+            console.log('draw event', evt);
+            remoteMousePressed = true;
+            ctx.beginPath();
+            ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+        });
+        socket.on('draw-mouseup', function (evt) {
+            console.log('draw event', evt);
+            remoteMousePressed = false;
+        });
+        socket.on('draw-mousemove', function (evt) {
+            console.log('draw event', evt);
+            if (remoteMousePressed) {
+                ctx.lineTo(evt.clientX - rect.left, evt.clientY - rect.top);
+                ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+                ctx.stroke();
+            }
+        });
+        socket.on('guess-correct', function (payload) {
+            console.log('correct', payload);
+            var ele = document.createElement('li');
+            ele.innerHTML = payload.by  + ' found the lost object (+1)';
+            document.getElementById('player' + payload.byId).innerText = payload.by + ' [ ' + payload.score + ' ] ';
+            guessLogList.appendChild(ele);
+            setVisibility(document.getElementById('guessComponent'), 'none');
+        });
+        socket.on('guess-wrong', function (payload) {
+            console.log('wrong', payload);
+            var ele = document.createElement('li');
+            ele.innerHTML = 'Wrong guess <b>' + payload.word + '</b> by ' + payload.by;
+            guessLogList.appendChild(ele);
+        });
+        socket.on('game-end', function (payload) {
+            console.log('game-end', payload);
+            setCurrentView('Result');
+            for (var i = 0; i < payload.players.length; i++) {
+                var player = payload.players[i];
+                var ele = document.createElement('li');
+                ele.innerHTML = player.name + ' - ' + player.score;
+                scoreList.appendChild(ele);
+            }
+        });
+    }
+
+    window.joinGame = function(username) {
+        socket.emit('join', {username: username});
+        setCurrentView('Game');
+    };
+
+    window.guessWord = function(word) {
+        socket.emit('guess', {word: word});
+    };
+    
+    canvas.addEventListener('mousedown', function (evt) {
+      console.log('event mousedown', evt);
+      if (drawLock) return;
+      canvasPressed = true;
+      ctx.beginPath();
+      ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+      socket.emit('draw-mousedown', { clientX: evt.clientX, clientY: evt.clientY});
+    });
+    
+    canvas.addEventListener('mouseup', function (evt) {
+      console.log('event mouseup', evt);
+      if (drawLock) return;
+      canvasPressed = false;
+      socket.emit('draw-mouseup', {});
+    });
+    
+    canvas.addEventListener('mousemove', function (evt) {
+      console.log('event mousemove', evt);
+      if (drawLock) return;
+      if (canvasPressed) {
+        ctx.lineTo(evt.clientX - rect.left, evt.clientY - rect.top);
+        ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+        ctx.stroke();
+        socket.emit('draw-mousemove', { clientX: evt.clientX, clientY: evt.clientY});
+      }
+    });
     /**
      * Client module init
      */
     function init() {
+        setCurrentView('Join');
+        setConnectionStatus('Initializing game...');
         socket = io({ upgrade: false, transports: ["websocket"] });
-        buttons = document.getElementsByTagName("button");
-        message = document.getElementById("message");
-        score = document.getElementById("score");
-        disableButtons();
-        bind();
+        bindConnectionEvents();
+        bindGameEvents();
     }
 
     window.addEventListener("load", init, false);
