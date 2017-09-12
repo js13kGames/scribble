@@ -78,7 +78,7 @@
             console.log('draw event', evt);
             remoteMousePressed = true;
             ctx.beginPath();
-            ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+            ctx.moveTo(evt.clientX, evt.clientY);
         });
         socket.on('draw-mouseup', function (evt) {
             console.log('draw event', evt);
@@ -87,8 +87,8 @@
         socket.on('draw-mousemove', function (evt) {
             console.log('draw event', evt);
             if (remoteMousePressed) {
-                ctx.lineTo(evt.clientX - rect.left, evt.clientY - rect.top);
-                ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+                ctx.lineTo(evt.clientX, evt.clientY);
+                ctx.moveTo(evt.clientX, evt.clientY);
                 ctx.stroke();
             }
         });
@@ -141,7 +141,7 @@
       if (drawLock) return;
       canvasPressed = true;
       ctx.beginPath();
-      ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+      ctx.moveTo(evt.clientX, evt.clientY);
       socket.emit('draw-mousedown', { clientX: evt.clientX, clientY: evt.clientY});
     });
     
@@ -156,8 +156,8 @@
       console.log('event mousemove', evt);
       if (drawLock) return;
       if (canvasPressed) {
-        ctx.lineTo(evt.clientX - rect.left, evt.clientY - rect.top);
-        ctx.moveTo(evt.clientX - rect.left, evt.clientY - rect.top);
+        ctx.lineTo(evt.clientX, evt.clientY);
+        ctx.moveTo(evt.clientX, evt.clientY);
         ctx.stroke();
         socket.emit('draw-mousemove', { clientX: evt.clientX, clientY: evt.clientY});
       }
