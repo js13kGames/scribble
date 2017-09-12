@@ -11,6 +11,10 @@
 </header>
 
 <div id="pageJoin" style="text-align:center; margin-top: 20px;">
+    <img src="logo.png" alt="game logo" />
+    <p>
+        Hey there! Everyone loses something everyday. Scribble will help you or someone to find something they lost.
+    </p>   
     <div>
         <span>Type your name</span>
         <input id="username" type="text" />
@@ -18,17 +22,16 @@
     </div>
 </div>
 
-<div id="pageGame">
+<div id="pageGame" style="text-align:center; margin-top: 20px;">
     <div>
-        <ul id="playersList">
-        </ul>
         <p id="help"></p>
-        <canvas id="gameBoard" width="600" height="600" style="border: 1px solid;">
-        </canvas>
-        <div id="guessComponent">
+        <div id="guessComponent" style="margin-top: 20px;">
             <input id="guessBox" type="text" />
             <button onclick="guessWord(document.getElementById('guessBox').value)">Guess</button> 
+            <p id="guessComment"></p>
         </div>
+        <canvas id="gameBoard" width="600" height="600" style="border: 1px solid; margin-top: 20px;">
+        </canvas>
         <div id="guessLogComponent">
             <ul id="guessLogList">
             </ul>
@@ -36,10 +39,12 @@
     </div>
 </div>
 
-<div id="pageResult">
-    Game Ended
-    <ul id="scoreList">
-    </ul>
+<div id="pageResult" style="text-align:center; margin-top: 20px;">
+    <img src="logo.png" alt="game logo" />
+    <p id="resultComment">
+    </p>
+    <br />
+    <p>May be it's time to help some people in real life.</p> 
 </div>
 
 <footer style="text-align: center; margin-top: 20px;">

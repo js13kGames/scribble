@@ -1,7 +1,7 @@
 'use strict';
 
 var games = [];
-var words = ['face', 'cat', 'dog', 'chair', 'table', 'knife'];
+var words = ['cat', 'dog', 'chair', 'table', 'knife', 'spoon', 'pen', 'pot', 'cup', 'computer', 'laptop', 'notebook', 'apple', 'tree', 'phone', 'mouse', 'bag'];
 
 function getRandomInt(min, max) {
 	min = Math.ceil(min);
@@ -173,8 +173,10 @@ module.exports = function (socket) {
 			if (connectedUser.game.correctlyGuessedPlayers === connectedUser.game.users.length - 1) {
 				connectedUser.game.announce('game-end',
 					{
+						word: connectedUser.game.word,
 						reason: 'All players found the lost object',
-						players: connectedUser.game.getUsers()
+						players: connectedUser.game.getUsers(),
+						drawingPlayerId: connectedUser.game.drawingUser
 					}
 				);
 			}

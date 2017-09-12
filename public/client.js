@@ -51,20 +51,24 @@
     function bindGameEvents() {
         socket.on('gameStart', function (payload) {
             console.log(payload);
-            var playersList = document.getElementById('playersList');
+            var guessers = [];
+            var drawer;
+            var playerDetails = document.getElementById('playerDetails');             
             for (var i = 0; i < payload.players.length; i++) {
                 var user = payload.players[i];
-                var ele = document.createElement('li');
-                ele.innerText = user.name + ' [ ' + user.score + ' ] ';
-                ele.id = 'player' + user.id;
-                playersList.appendChild(ele);
+                if (i == payload.drawingPlayerId) {
+                    drawer = user;
+                } else {
+                    guessers.push(user.name);
+                }
             }
             if (payload.word) {
                 drawLock = false;
-                document.getElementById('help').innerHTML = 'Draw <b>' + payload.word + '</b>';
+                document.getElementById('help').innerHTML = 'Draw and help ' + guessers.join() + ' find the lost <h2>' + payload.word + '</h2>';
                 setVisibility(document.getElementById('guessComponent'), 'none');
             } else {
                 drawLock = true;
+                document.getElementById('help').innerHTML = drawer.name + ' is trying to help you find a lost object.'
                 setVisibility(document.getElementById('guessComponent'), 'block');
             }
         });
@@ -92,7 +96,6 @@
             console.log('correct', payload);
             var ele = document.createElement('li');
             ele.innerHTML = payload.by  + ' found the lost object (+1)';
-            document.getElementById('player' + payload.byId).innerText = payload.by + ' [ ' + payload.score + ' ] ';
             guessLogList.appendChild(ele);
             setVisibility(document.getElementById('guessComponent'), 'none');
         });
@@ -101,26 +104,36 @@
             var ele = document.createElement('li');
             ele.innerHTML = 'Wrong guess <b>' + payload.word + '</b> by ' + payload.by;
             guessLogList.appendChild(ele);
+            document.getElementById('guessComment').innerHTML = '<span style="color: red;">' + payload.word + '</span> is wrong.';
+            document.getElementById('guessBox').value = '';
         });
         socket.on('game-end', function (payload) {
             console.log('game-end', payload);
-            setCurrentView('Result');
+            setCurrentView('Result'); 
+            var drawer;
+            var guessers = [];           
             for (var i = 0; i < payload.players.length; i++) {
                 var player = payload.players[i];
-                var ele = document.createElement('li');
-                ele.innerHTML = player.name + ' - ' + player.score;
-                scoreList.appendChild(ele);
+                if (i === payload.drawingPlayerId)
+                    drawer = player;
+                else
+                    guessers.push(player.name);
             }
+            document.getElementById('resultComment').innerHTML = drawer.name + ' helped ' +
+                guessers.join() + ' to find the lost ' + payload.word + ' on the internet.';
         });
     }
 
     window.joinGame = function(username) {
+        document.getElementById('help').innerHTML = 'Trying to find someone to play with you...';
         socket.emit('join', {username: username});
         setCurrentView('Game');
+        setVisibility(document.getElementById('guessComponent'), 'none');
     };
 
     window.guessWord = function(word) {
-        socket.emit('guess', {word: word});
+        if (word && word.length > 0)
+            socket.emit('guess', {word: word});
     };
     
     canvas.addEventListener('mousedown', function (evt) {
