@@ -1,0 +1,6 @@
+---
+post: https://medium.com/@scriptnull/scribble-82c04fb6f7d3
+# See github.com/js13kGames/hello-world for supported frontmatter
+---
+
+Scribble is a draw and guess multiplayer game. It has minimalistic gameplay. It starts with one player trying to help another player find a lost object. Towards the end, it encourages people to help more in real life.
