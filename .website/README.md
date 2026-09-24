@@ -1,4 +1,7 @@
 ---
+genres:
+  - party
+  - casual
 post: https://medium.com/@scriptnull/scribble-82c04fb6f7d3
 # See github.com/js13kGames/hello-world for supported frontmatter
 ---
